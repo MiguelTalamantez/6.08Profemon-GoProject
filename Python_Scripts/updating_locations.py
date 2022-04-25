@@ -54,7 +54,7 @@ def request_handler(request):
 
 
     elif request['method'] == 'GET' and 'start' in request['args']:
-        deck = 4*['Peter Dourmashkin'] + 9*['Donald Sadoway'] + 7*['Adam Willard'] + 5*['Brad Pentelute'] + 3*['Rick Danheiser'] + 8*['John Bush'] + 7*['Larry Guth'] + 5*['David Jerison'] + 3*['Bjorn Poonen'] + 1*['Tristan Collins'] + 9*['John Guttag'] + 6*['Adam Hartz'] + 3*['Max Goldman'] + 7*['Silvina Hinono Wachman'] + 5*['Katrina LaCurts'] + 3*['Steven Leeb'] + 1*['Joe Steinmeyer'] + 7*['Erik Demaine'] + 5*['Mauricio Karchmer'] + 2*['David Karger']
+        deck = 4*['Peter Dourmashkin'] + 9*['Donald Sadoway'] + 7*['Adam Willard'] + 5*['Brad Pentelute'] + 3*['Rick Danheiser'] + 8*['John Bush'] + 7*['Larry Guth'] + 5*['David Jerison'] + 3*['Bjorn Poonen'] + 1*['Tristan Collins'] + 9*['John Guttag'] + 6*['Adam Hartz'] + 3*['Max Goldman'] + 7*['Silvina Hinono Wachman'] + 5*['Katrina LaCurts'] + 3*['Steven Leeb'] + 1*['Joe Steinmeyer'] + 7*['Erik Demaine'] + 5*['Mauricio Karchmer'] + 2*['David Karger'] + 15*['David Perreault']
         clone = deck[:]
         random.shuffle(clone)
         located = []
@@ -65,7 +65,7 @@ def request_handler(request):
                 if prof == profs:
                     clone.remove(profs)
 
-        available = ['Peter Dourmashkin', 'Donald Sadoway', 'Adam Willard', 'Brad Pentelute', 'Rick Danheiser', 'John Bush', 'Larry Guth', 'David Jerison', 'Bjorn Poonen', 'Tristan Collins', 'John Guttag', 'Adam Hartz', 'Max Goldman', 'Silvina Hinono Wachman', 'Katrina LaCurts', 'Steven Leeb', 'Joe Steinmeyer', 'Erik Demaine', 'Mauricio Karchmer', 'David Karger']
+        available = ['Peter Dourmashkin', 'Donald Sadoway', 'Adam Willard', 'Brad Pentelute', 'Rick Danheiser', 'John Bush', 'Larry Guth', 'David Jerison', 'Bjorn Poonen', 'Tristan Collins', 'John Guttag', 'Adam Hartz', 'Max Goldman', 'Silvina Hinono Wachman', 'Katrina LaCurts', 'Steven Leeb', 'Joe Steinmeyer', 'Erik Demaine', 'Mauricio Karchmer', 'David Karger', 'David Perreault']
         conn = sqlite3.connect('/var/jail/home/team3/prof_info.db')
         c = conn.cursor()
 
@@ -78,7 +78,11 @@ def request_handler(request):
 
         c.execute('''CREATE TABLE IF NOT EXISTS locations (prof text, location text, timing timestamp);''')
         for professor in available:
-            c.execute('''UPDATE locations SET location = (?), timing = (?) WHERE prof = (?);''', ('None', datetime.datetime.now(), professor))
+            in_table = c.execute('''SELECT * from locations WHERE prof = (?);''', (professor,)).fetchall()
+            if len(in_table) == 0:
+                c.execute('''INSERT into locations VALUES (?,?,?)''', (professor, 'None', datetime.datetime.now()))
+            else:
+                c.execute('''UPDATE locations SET location = (?), timing = (?) WHERE prof = (?);''', ('None', datetime.datetime.now(), professor))
         for professor in locations:
             c.execute('''UPDATE locations SET location = (?), timing = (?) WHERE prof = (?);''', (locations[professor], datetime.datetime.now(), professor))
         on_deck = c.execute('''SELECT * from locations WHERE location != (?);''', ('None', )).fetchall()

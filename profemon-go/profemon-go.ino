@@ -72,10 +72,12 @@ uint32_t swing_times[30];
 
 uint8_t change_display = 0;
 uint8_t new_profemon = 0;
-char display_name[] = "JOE STEINMEYER";
-char profemon_name[] = "Joe Steinmeyer";
+char display_name[50] = "";
+char profemon_name[50] = "";
 char *profemon_data_labels[5] = {"type", "hp", "attack", "moves"};
 char profemon_data[5][20] = {""};
+char profedex_data[1000];
+char* begin_profedex = 0;
 
 double latitude = 0.0;
 double longitude = 0.0;
@@ -83,6 +85,8 @@ double longitude = 0.0;
 // Jason's Variables
 uint8_t get_loc_state; //used for containing button state and detecting edges
 int old_get_loc_state; //used for detecting button edges
+int offset = 0;
+uint32_t loc_timer = 0;
 
 void setup() {
   Serial.begin(115200); //for debugging if needed.
@@ -129,6 +133,7 @@ void setup() {
   pinMode(BUTTON1, INPUT_PULLUP);
   pinMode(BUTTON2, INPUT_PULLUP);
   pinMode(BUTTON3, INPUT_PULLUP);
+  loc_timer = millis();
 }
 
 /*********************************************
@@ -142,8 +147,8 @@ void setup() {
 void loop() {
     tft.setCursor(0, 0);
     get_loc_state = digitalRead(BUTTON3);
-    if (!get_loc_state && get_loc_state != old_get_loc_state) {
-        int offset = sprintf(json_body, "%s", PREFIX);
+    if (millis() - loc_timer > 30000) {
+        offset = sprintf(json_body, "%s", PREFIX);
         int n = WiFi.scanNetworks(); //run a new scan. could also modify to use original scan from setup so quicker (though older info)
         Serial.println("scan done");
         if (n == 0) {
@@ -163,6 +168,7 @@ void loop() {
         // Make a HTTP request:
         Serial.println("SENDING REQUEST");
         request_buffer[0] = '\0'; //set 0th byte to null
+        response_buffer[0] = '\0'; //set 0th byte to null
         offset = 0; //reset offset variable for sprintf-ing
         offset += sprintf(request_buffer + offset, "POST https://www.googleapis.com/geolocation/v1/geolocate?key=%s  HTTP/1.1\r\n", API_KEY);
         offset += sprintf(request_buffer + offset, "Host: googleapis.com\r\n");
@@ -187,10 +193,24 @@ void loop() {
         latitude = doc["location"]["lat"];
         longitude = doc["location"]["lng"];
 
-        strcpy(request_buffer, "");
         request_buffer[0] = '\0'; //set 0th byte to null
+        response_buffer[0] = '\0'; //set 0th byte to null
         offset = 0; //reset offset variable for sprintf-ing
+
+        sprintf(request_buffer, "GET /sandbox/sc/team3/nearby_profemon.py?lat=%f&lon=%f HTTP/1.1\r\nHost: 608dev-2.net\r\n\r\n", latitude, longitude);
+        do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+        Serial.printf("%s, %d", response_buffer, strlen(response_buffer));
+        char* comma = strchr(response_buffer, ',');
+        if (comma != NULL) {
+            strncpy(profemon_name, response_buffer, comma-response_buffer);
+            strcpy(display_name, comma+1);
         }
+
+        Serial.println(profemon_name);
+        Serial.println(display_name);
+        change_display = 1;
+        }
+        loc_timer = millis();
     }
 
     if (change_display == 1) {
@@ -200,7 +220,11 @@ void loop() {
     if (game_state == Map) {
         update_idle_mode(digitalRead(BUTTON1), digitalRead(BUTTON2));
         if (idle_state == Idle) {
-            tft.printf("There is a %s nearby...\nWould you like to catch them?\n\nYES: Button 1\nNO: Button 2\n", display_name);
+            if (strlen(profemon_name) != 0 && strlen(display_name) != 0) {
+                tft.printf("There is a %s nearby...\nWould you like to catch them?\n\nYES: Button 1\nNO: Button 2\n", display_name);
+            } else {
+                tft.printf("IDLE");
+            }
         }
     } else if (game_state == Catch) {
         update_catch_mode(digitalRead(BUTTON1), digitalRead(BUTTON2), motion);
@@ -277,6 +301,23 @@ void update_catch_mode(int in1, int in2, int motion) {
             break;
         case Throw_End:
             if (calculate_success() == 1) {
+                Serial.println("throw successful");
+                // Make a HTTP request:
+                request_buffer[0] = '\0'; //set 0th byte to null
+                response_buffer[0] = '\0'; //set 0th byte to null
+                char data[500];
+                sprintf(data, "lat_captured=%f&lon_captured=%f&prof_id=%s&user_id=%s&limit=5", latitude, longitude, profemon_name, user); 
+                Serial.println(data);
+                offset = 0; //reset offset variable for sprintf-ing
+                offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/profedex_editor.py?%s  HTTP/1.1\r\n", data);
+                offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
+                do_http_request("608dev-2.net", request_buffer, profedex_data, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+                Serial.println(request_buffer);
+                Serial.println("-----------");
+                Serial.println(profedex_data);
+                begin_profedex = strchr(profedex_data, '\n') + 1;
+                Serial.println("-----------");
+                delay(2000);
                 change_display = 1;
                 catch_state = Catch_Success;
             } else {
@@ -286,7 +327,7 @@ void update_catch_mode(int in1, int in2, int motion) {
             state_timer = millis();
             break;
         case Catch_Success:
-            if (millis() - state_timer > 5000) {
+            if (millis() - state_timer > 10000) {
                 change_display = 1;
                 catch_state = Catch_Idle;
                 game_state = Map;
@@ -326,7 +367,14 @@ void catch_display() {
             tft.printf("Aw, you missed!");
             break;
         case Catch_Success:
-            tft.printf("Congratulations!\n%s has been caught!\n\nYou will be taken back to the map shortly...", display_name);
+            if (strlen(profemon_name) != 0 && strlen(display_name) != 0) {
+                tft.printf("Gotcha!\n%s was caught!\n\n", display_name);
+                tft.printf("%s", begin_profedex);
+            }
+            if (change_display == 0) {
+                profemon_name[0] = '\0';
+                display_name[0] = '\0';
+            }
             break;
     }
 }
@@ -405,20 +453,20 @@ void is_moving() {
 int calculate_success() {
     float avg_time = 0;
     for (int i = 2; i <= swing_counter; i++) {
-        Serial.printf("Time between swing %d and %d: %d millisec\n", i-1, i, swing_times[i]);
+        // Serial.printf("Time between swing %d and %d: %d millisec\n", i-1, i, swing_times[i]);
         avg_time += swing_times[i];
     }
     avg_time /= (swing_counter-1);
-    Serial.printf("Avg swing time: %f\n", avg_time);
+    // Serial.printf("Avg swing time: %f\n", avg_time);
     float avg_error = 0;
     for (int i = 2; i <= swing_counter; i++) {
-      Serial.println(abs(avg_time-swing_times[i])/(avg_time));
+    //   Serial.println(abs(avg_time-swing_times[i])/(avg_time));
         avg_error += abs(avg_time-swing_times[i])/(avg_time);
     }
     avg_error /= (swing_counter-1);
-    Serial.printf("Avg err: %f\n", avg_error);
+    // Serial.printf("Avg err: %f\n", avg_error);
     float err_mult = avg_error/(swing_counter-1);
-    Serial.printf("Err w/ mult: %f\n", err_mult);
+    // Serial.printf("Err w/ mult: %f\n", err_mult);
 
     if (err_mult > 0.5) { err_mult = 0.5; }
 

@@ -41,6 +41,31 @@ def request_handler(request):
         conn.close()
         return info[0]
 
+    elif request['method'] == 'POST' and 'professor' in request['values']:
+        professor = request['values']['professor'] if 'professor' in request['values'] else 'n/a'
+        dept = int(request['values']['dept']) if 'dept' in request['values'] else 0
+        course = request['values']['course'] if 'course' in request['values'] else 'n/a'
+        evol = request['values']['evol'] if 'evol' in request['values'] else 'n/a'
+        loc = request['values']['loc'] if 'loc' in request['values'] else 'n/a'
+        move1 = request['values']['move1'] if 'move1' in request['values'] else 'n/a'
+        move2 = request['values']['move2'] if 'move2' in request['values'] else 'n/a'
+        attack = int(request['values']['attack']) if 'attack' in request['values'] else 0
+        hp = int(request['values']['hp']) if 'hp' in request['values'] else 0
+
+        conn = sqlite3.connect('/var/jail/home/team3/prof_info.db')
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS profedex (prof text, type int, course float, evolutions text, locations text, 
+            move1 text, move2 text, attack int, hp int, timing timestamp);''')
+
+        c.execute('''INSERT into profedex VALUES (?,?,?,?,?,?,?,?,?,?);''', (professor, dept, course, evol, loc, move1, 
+        move2, attack, hp, datetime.datetime.now()))
+
+        data = c.execute('''SELECT * FROM profedex ORDER BY timing ASC;''').fetchall()
+        conn.commit()
+        conn.close()
+        return data
+
+
 
     elif request['method'] == 'POST':
         professor = ['Peter Dourmashkin', 'Donald Sadoway', 'Adam Willard', 'Brad Pentelute', 'Rick Danheiser', 'John Bush', 'Larry Guth', 'David Jerison', 'Bjorn Poonen', 'Tristan Collins', 'John Guttag', 'Adam Hartz', 'Max Goldman', 'Silvina Hinono Wachman', 'Katrina LaCurts', 'Steven Leeb', 'Joe Steinmeyer', 'Erik Demaine', 'Mauricio Karchmer', 'David Karger']
@@ -65,7 +90,7 @@ def request_handler(request):
         data = c.execute('''SELECT * FROM profedex ORDER BY timing ASC;''').fetchall()
         conn.commit()
         conn.close()
-        return data[:20]
+        return data
 
     
 
