@@ -27,7 +27,6 @@ char request_buffer[IN_BUFFER_SIZE]; //char array buffer to hold HTTP request
 char response_buffer[OUT_BUFFER_SIZE]; //char array buffer to hold HTTP response
 char json_body[JSON_BODY_SIZE];
 char bufferb[1000];
-char x = "a";
 WiFiClientSecure client; //global WiFiClient Secure object
 WiFiClient client2; //global WiFiClient Secure object
 StaticJsonDocument<500> doc;
@@ -167,6 +166,8 @@ void loop() {
         int len = strlen(json_body);
         // Make a HTTP request:
         Serial.println("SENDING REQUEST");
+        strcpy(request_buffer, "");
+        strcpy(response_buffer, "");
         request_buffer[0] = '\0'; //set 0th byte to null
         response_buffer[0] = '\0'; //set 0th byte to null
         offset = 0; //reset offset variable for sprintf-ing
@@ -193,6 +194,8 @@ void loop() {
         latitude = doc["location"]["lat"];
         longitude = doc["location"]["lng"];
 
+        strcpy(request_buffer, "");
+        strcpy(response_buffer, "");
         request_buffer[0] = '\0'; //set 0th byte to null
         response_buffer[0] = '\0'; //set 0th byte to null
         offset = 0; //reset offset variable for sprintf-ing
@@ -303,6 +306,8 @@ void update_catch_mode(int in1, int in2, int motion) {
             if (calculate_success() == 1) {
                 Serial.println("throw successful");
                 // Make a HTTP request:
+                strcpy(request_buffer, "");
+                strcpy(response_buffer, "");
                 request_buffer[0] = '\0'; //set 0th byte to null
                 response_buffer[0] = '\0'; //set 0th byte to null
                 char data[500];

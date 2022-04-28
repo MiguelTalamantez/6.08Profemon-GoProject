@@ -22,7 +22,7 @@ def request_handler(request):
         captured = request['values']['professor'] 
         found = (request['values']['lat'], request['values']['lon'])
         
-        deck = 4*['Peter Dourmashkin'] + 9*['Donald Sadoway'] + 7*['Adam Willard'] + 5*['Brad Pentelute'] + 3*['Rick Danheiser'] + 8*['John Bush'] + 7*['Larry Guth'] + 5*['David Jerison'] + 3*['Bjorn Poonen'] + 1*['Tristan Collins'] + 9*['John Guttag'] + 6*['Adam Hartz'] + 3*['Max Goldman'] + 7*['Silvina Hinono Wachman'] + 5*['Katrina LaCurts'] + 3*['Steven Leeb'] + 1*['Joe Steinmeyer'] + 7*['Erik Demaine'] + 5*['Mauricio Karchmer'] + 2*['David Karger']
+        deck = 4*['Peter Dourmashkin'] + 9*['Donald Sadoway'] + 7*['Adam Willard'] + 5*['Brad Pentelute'] + 3*['Rick Danheiser'] + 8*['John Bush'] + 7*['Larry Guth'] + 5*['David Jerison'] + 3*['Bjorn Poonen'] + 1*['Tristan Collins'] + 9*['John Guttag'] + 6*['Adam Hartz'] + 3*['Max Goldman'] + 7*['Silvina Hinono Wachman'] + 5*['Katrina LaCurts'] + 3*['Steven Leeb'] + 1*['Joe Steinmeyer'] + 7*['Erik Demaine'] + 5*['Mauricio Karchmer'] + 2*['David Karger'] + 15*['David Perreault']
         clone = deck[:]
 
         removed = {captured:found} # dictionary with all things to be removed from clone deck
