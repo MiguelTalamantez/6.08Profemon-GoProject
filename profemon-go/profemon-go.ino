@@ -27,7 +27,7 @@ char request_buffer[IN_BUFFER_SIZE]; //char array buffer to hold HTTP request
 char response_buffer[OUT_BUFFER_SIZE]; //char array buffer to hold HTTP response
 char json_body[JSON_BODY_SIZE];
 char bufferb[1000];
-
+char x = "a";
 WiFiClientSecure client; //global WiFiClient Secure object
 WiFiClient client2; //global WiFiClient Secure object
 StaticJsonDocument<500> doc;
