@@ -142,7 +142,7 @@ void setup() {
 
 void loop() {
     tft.setCursor(0, 0);
-    update_location_and_profs()
+    update_location_and_profs();
     
     if (change_display == 1) {
         tft.fillScreen(TFT_BLACK);
