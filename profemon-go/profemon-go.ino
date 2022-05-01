@@ -424,6 +424,7 @@ int calculate_catch_success() {
 // Should be called every loop (or at least once every 5-ish seconds)
 void update_location_and_profs() {
     if (millis() - loc_timer > 30000) {
+        strcpy(json_body, "");
         offset = sprintf(json_body, "%s", PREFIX);
         int n = WiFi.scanNetworks(); //run a new scan. could also modify to use original scan from setup so quicker (though older info)
         Serial.println("scan done");
@@ -484,6 +485,9 @@ void update_location_and_profs() {
         if (comma != NULL) {
             strncpy(profemon_name, response_buffer, comma-response_buffer);
             strcpy(display_name, comma+1);
+        } else if (game_state == Map) {
+            strcpy(profemon_name, "");
+            strcpy(display_name, "");
         }
 
         Serial.println(profemon_name);
