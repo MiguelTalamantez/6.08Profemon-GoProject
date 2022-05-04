@@ -698,6 +698,7 @@ void loop() {
             int len = strlen(json_body);
             // Make a HTTP request:
             Serial.println("SENDING REQUEST");
+            strcpy(request,"");
             request[0] = '\0'; //set 0th byte to null
             offset = 0; //reset offset variable for sprintf-ing
             offset += sprintf(request + offset, "POST https://www.googleapis.com/geolocation/v1/geolocate?key=%s  HTTP/1.1\r\n", API_KEY);
@@ -706,7 +707,7 @@ void loop() {
             offset += sprintf(request + offset, "cache-control: no-cache\r\n");
             offset += sprintf(request + offset, "Content-Length: %d\r\n\r\n", len);
             offset += sprintf(request + offset, "%s", json_body);
-            do_https_request("googleapis.com", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+            do_https_request("googleapis.com", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
             Serial.println("-----------");
             Serial.println(response);
             Serial.println("-----------");
@@ -735,7 +736,7 @@ void loop() {
             offset += sprintf(request + offset, "Content-Length: %d\r\n\r\n", len);
             offset += sprintf(request + offset, "%s", json_body);
             Serial.println(request);
-            do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+            do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
             Serial.println("-----------");
             Serial.println(response);
             Serial.println("-----------");
@@ -816,6 +817,7 @@ void loop() {
         int len = strlen(json_body);
         // Make a HTTP request:
         Serial.println("SENDING REQUEST");
+        strcpy(request, "");
         request[0] = '\0'; //set 0th byte to null
         offset = 0; //reset offset variable for sprintf-ing
         offset += sprintf(request + offset, "POST https://www.googleapis.com/geolocation/v1/geolocate?key=%s  HTTP/1.1\r\n", API_KEY);
@@ -824,7 +826,7 @@ void loop() {
         offset += sprintf(request + offset, "cache-control: no-cache\r\n");
         offset += sprintf(request + offset, "Content-Length: %d\r\n\r\n", len);
         offset += sprintf(request + offset, "%s", json_body);
-        do_https_request("www.googleapis.com", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+        do_https_request("www.googleapis.com", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
         Serial.println("-----------");
         Serial.println(response);
         Serial.println("-----------");
@@ -853,7 +855,7 @@ void loop() {
         offset += sprintf(request + offset, "Content-Length: %d\r\n\r\n", len);
         offset += sprintf(request + offset, "%s", json_body);
         Serial.println(request);
-        do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+        do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
         Serial.println("-----------");
         Serial.println(response);
         Serial.println("-----------");
@@ -1215,16 +1217,18 @@ void update_battle_mode(int in1, int in2, int in3, int old1, int old2, int old3)
 }
 
 void make_server_request(int type) {
+  strcpy(request_buffer, "");
   request_buffer[0] = '\0'; //set 0th byte to null
   offset = 0; //reset offset variable for sprintf-ing
   
   if(type == start) {
     // send a POST request_buffer labeled "start" with the player_id and prof_id
+    strcpy(request_buffer, "");
     request_buffer[0] = '\0';
     offset = 0;
     offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=start&player_id=%s&prof_id=%s  HTTP/1.1\r\n",user,profemon_id);
     offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
-    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
 
     // info to store: game_id, gesture, our own hp (as both player_hp and old_player_hp)
     char breaks[2];
@@ -1247,11 +1251,12 @@ void make_server_request(int type) {
     Serial.printf("GAME HAS BEGUN! id is %u\n",game_id);
 
     // send a GET request_buffer to profedex.py asking for attack
+    strcpy(request_buffer, "");
     request_buffer[0] = '\0';
     offset = 0;
     offset += sprintf(request_buffer + offset, "GET http://608dev-2.net/sandbox/sc/team3/profedex.py?professor=%s&item=attack  HTTP/1.1\r\n",profemon_id);
     offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
-    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
 
     // info to store: our own attack value
     max_attack = atoi(response_buffer);
@@ -1259,11 +1264,12 @@ void make_server_request(int type) {
     Serial.printf("max attack score is: %u\n",max_attack);
 
     // send ANOTHER request_buffer to figure out what your prof-emon's two moves are
+    strcpy(request_buffer, "");
     request_buffer[0] = '\0';
     offset = 0;
     offset += sprintf(request_buffer + offset, "GET http://608dev-2.net/sandbox/sc/team3/profedex.py?professor=%s&item=moves  HTTP/1.1\r\n",profemon_id);
     offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
-    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
 
     char* ending1 = strrchr(response_buffer, '\n');
     *(ending1 + 0) = NULL;
@@ -1286,7 +1292,7 @@ void make_server_request(int type) {
     // send a GET request_buffer labeled "turn" with the game_id and player_id
     offset += sprintf(request_buffer + offset, "GET http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=turn&player_id=%s&game_id=%u  HTTP/1.1\r\n",user,game_id);
     offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
-    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
 
     // if the response is just "-1", the game hasn't started yet, and we should just keep waiting for the other player to enter the game
     if(strncmp(response_buffer,"-1",2)==0) {
@@ -1327,21 +1333,23 @@ void make_server_request(int type) {
   }
   else if(type == attack) {
     // send a POST request_buffer labeled "attack" with the game_id, player_id, move, and damage
+    strcpy(request_buffer, "");
     request_buffer[0] = '\0';
     offset = 0;
     offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=attack&player_id=%s&game_id=%u&move=%s&damage=%u  HTTP/1.1\r\n",user,game_id,last_move,damage_done);
     offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
     Serial.printf("sending an attack request_buffer with url %s\n",request_buffer);
-    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
     Serial.printf("request_buffer has been sent\n");
   }
   else if(type == forfeit) {
     // send a POST request_buffer labeled "forfeit" with the game_id and player_id
+    strcpy(request_buffer, "");
     request_buffer[0] = '\0';
     offset = 0;
     offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=forfeit&player_id=%s&game_id=%u  HTTP/1.1\r\n",user,game_id);
     offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
-    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
   }
 }
 
@@ -1689,6 +1697,8 @@ void catch_display() {
               //UPLOAD PROFEMON TO DATABASE
             }
             if (change_display == 0) {
+                strcpy(profemon_name,"");
+                strcpy(display_name,"");
                 profemon_name[0] = '\0';
                 display_name[0] = '\0';
             }
@@ -1832,7 +1842,7 @@ void update_location_and_profs() {
         offset += sprintf(request_buffer + offset, "cache-control: no-cache\r\n");
         offset += sprintf(request_buffer + offset, "Content-Length: %d\r\n\r\n", len);
         offset += sprintf(request_buffer + offset, "%s", json_body);
-        do_https_request("googleapis.com", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+        do_https_request("googleapis.com", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
         Serial.println("-----------");
         Serial.println(response_buffer);
         Serial.println("-----------");
@@ -1923,7 +1933,7 @@ void profedex_navigator(int button_forward, int button_backward){
     offset += sprintf(request + offset, "Host: 608dev-2.net\r\n");
     offset += sprintf(request + offset, "\r\n");
     Serial.println(request);
-    do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+    do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
     Serial.println("-----------");
     Serial.println(response);
     Serial.println("-----------");
@@ -1932,7 +1942,3 @@ void profedex_navigator(int button_forward, int button_backward){
     delay(1000);
   }
 }
-
-
-
-
