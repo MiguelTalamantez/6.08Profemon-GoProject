@@ -518,7 +518,7 @@ void setup() {
   
   //Profedex Related Setup
   idx = 0;
-  firsttime = 0;
+  firsttime = 1;
 
 
   //SCAN WIFI AND CONNECT
@@ -710,21 +710,104 @@ void loop() {
     }
   }
 
-  if (overallstate == 2){
+  else if (overallstate == 2){
         //tft.fillScreen(TFT_BLACK);
         update_catch_mode(digitalRead(BUTTON1), digitalRead(BUTTON2), motion);
         is_moving();
         catch_display();
   }
   
-  if (overallstate == 9){
-    switch_state(button1);
-    profedex_navigator(button2, button3);
-    // if (button4 == 0){
-    //   overallstate = 0;
-    //   Serial.println("It goes back to main");
-    // }
+  else if (overallstate == 9){
+  switch_state(button1);
+  profedex_navigator(button2, button3);
+  if (button4 == 0){
+    overallstate = 0;
+    Serial.println("It goes back to main");
+    delay(500);
+    firsttime = 1;
+            //GET LOCATION VIA GEOLOCATION
+              int offset = sprintf(json_body, "%s", PREFIX);
+              int n = WiFi.scanNetworks(); //run a new scan. could also modify to use original scan from setup so quicker (though older info)
+              Serial.println("scan done");
+              if (n == 0) {
+                Serial.println("no networks found");
+              } else {
+              //tft.fillScreen(TFT_BLACK);
+                tft.setCursor(0,120);
+                tft.println("Updating location..."); 
+                int max_aps = max(min(MAX_APS, n), 1);
+                for (int i = 0; i < max_aps; ++i) { //for each valid access point
+                  uint8_t* mac = WiFi.BSSID(i); //get the MAC Address
+                  offset += wifi_object_builder(json_body + offset, JSON_BODY_SIZE-offset, WiFi.channel(i), WiFi.RSSI(i), WiFi.BSSID(i)); //generate the query
+                  if(i!=max_aps-1){
+                    offset +=sprintf(json_body+offset,",");//add comma between entries except trailing.
+                  }
+                }
+                sprintf(json_body + offset, "%s", SUFFIX);
+                Serial.println(json_body);
+                int len = strlen(json_body);
+                // Make a HTTP request:
+                Serial.println("SENDING REQUEST");
+                request[0] = '\0'; //set 0th byte to null
+                offset = 0; //reset offset variable for sprintf-ing
+                offset += sprintf(request + offset, "POST https://www.googleapis.com/geolocation/v1/geolocate?key=%s  HTTP/1.1\r\n", API_KEY);
+                offset += sprintf(request + offset, "Host: googleapis.com\r\n");
+                offset += sprintf(request + offset, "Content-Type: application/json\r\n");
+                offset += sprintf(request + offset, "cache-control: no-cache\r\n");
+                offset += sprintf(request + offset, "Content-Length: %d\r\n\r\n", len);
+                offset += sprintf(request + offset, "%s", json_body);
+                do_https_request(SERVER, request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+                Serial.println("-----------");
+                Serial.println(response);
+                Serial.println("-----------");
+
+                char* begin = strchr(response, '{');
+                char* end = strrchr(response, '}');
+                char djd[500];
+                strncpy(djd, begin, end-begin+1);
+                DeserializationError error = deserializeJson(doc, djd);
+                if (error) {
+                  Serial.print(F("deserializeJson() failed: "));
+                  Serial.println(error.f_str());
+                }
+                userlocationy = doc["location"]["lat"];
+                userlocationx = doc["location"]["lng"];
+
+                strcpy(request, "");
+                request[0] = '\0'; //set 0th byte to null
+                offset = 0; //reset offset variable for sprintf-ing
+                sprintf(json_body, "lat=%f&lon=%f\r\n", latitude, longitude);
+                Serial.println(json_body);
+                len = strlen(json_body);
+                offset += sprintf(request + offset, "POST http://608dev-2.net/sandbox/sc/team3/profemon_geolocation.py HTTP/1.1\r\n");
+                offset += sprintf(request + offset, "Host: 608dev-2.net\r\n");
+                offset += sprintf(request + offset, "Content-Type: application/x-www-form-urlencoded\r\n");
+                offset += sprintf(request + offset, "Content-Length: %d\r\n\r\n", len);
+                offset += sprintf(request + offset, "%s", json_body);
+                Serial.println(request);
+                do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+                Serial.println("-----------");
+                Serial.println(response);
+                Serial.println("-----------");
+                }
+
+            //PRINTTFT LOCATION
+              Serial.println(userlocationy, 6); 
+              Serial.println(userlocationx, 6); 
+              tft.fillScreen(TFT_BLACK);
+              tft.drawXBitmap(0, 0, flipped_map, 160, 128, 0xFFFF);
+              userdisplaytimer = millis();
+              float percentagex = abs ( (userlocationx-tft_x_min_geolocation)/(tft_x_max_geolocation-tft_x_min_geolocation) );
+              float percentagey = abs ( (userlocationy-tft_y_min_geolocation)/(tft_y_max_geolocation-tft_y_min_geolocation) );
+              tft.drawCircle(percentagex*160, 128 - percentagey*128, 3, TFT_BLUE);
+              tft.drawCircle(percentagex*160, 128 - percentagey*128, 4, TFT_RED);
+              tft.drawCircle(percentagex*160, 128 - percentagey*128, 5, TFT_BLUE);
+              tft.drawCircle(percentagex*160, 128 - percentagey*128, 6, TFT_RED);
+      
+  
   }
+}
+  
 
   overallstatefunction(button1, button2, button3, button4);
 }
