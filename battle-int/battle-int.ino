@@ -24,7 +24,6 @@ const int BUTTON4 = 34; //Button4 at pin 34
 
 // HTTP Request Variables
 const int RESPONSE_TIMEOUT = 6000; //ms to wait for response from host
-const int GETTING_PERIOD = 2000; //periodicity of getting a number fact.
 const int BUTTON_TIMEOUT = 1000; //button timeout in milliseconds
 const uint16_t IN_BUFFER_SIZE = 5000; //size of buffer to hold HTTP request
 const uint16_t OUT_BUFFER_SIZE = 5000; //size of buffer to hold HTTP response

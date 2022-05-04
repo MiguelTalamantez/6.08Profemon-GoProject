@@ -1,38 +1,38 @@
 void setup() {
-  // VARIABLES THAT THE USER SHOULD'VE ALREADY CHOSEN
-  strcpy(profemon_id,"Max Goldman");
+  // // VARIABLES THAT THE USER SHOULD'VE ALREADY CHOSEN
+  // strcpy(profemon_id,"Max Goldman");
 
-  // show the loading "battle is just beginning screen"
-  tft.printf("You have chosen %s as your Prof-emon!\n",profemon_id);
-  tft.printf("Loading...");
+  // // show the loading "battle is just beginning screen"
+  // tft.printf("You have chosen %s as your Prof-emon!\n",profemon_id);
+  // tft.printf("Loading...");
 
-  b1 = 1;
-  b2 = 1;
-  b3 = 1;
+  // b1 = 1;
+  // b2 = 1;
+  // b3 = 1;
 
-  old_b1_input = 1;
-  old_b2_input = 1;
-  old_b3_input = 1;
+  // old_b1_input = 1;
+  // old_b2_input = 1;
+  // // old_b3_input = 1;
 
-  delay(4000);
+  // delay(4000);
 
-  // Wifi setup
-  client2.setCACert(CA_CERT); //set cert for https
+  // // Wifi setup
+  // client2.setCACert(CA_CERT); //set cert for https
   
-  // variable initialization
-  num_turns = 0;
-  battle_state = 0;
+  // // // variable initialization
+  // // num_turns = 0;
+  // // battle_state = 0;
 
-  // send a POST request_buffer labeled "start" with the user id and the prof-emon, send another request_buffer for prof-emon's attack value, send ANOTHER request_buffer for prof-emon's two moves
-  // (all of these are accomplished within the server_request function)
-  make_server_request(start);
+  // // send a POST request_buffer labeled "start" with the user id and the prof-emon, send another request_buffer for prof-emon's attack value, send ANOTHER request_buffer for prof-emon's two moves
+  // // (all of these are accomplished within the server_request function)
+  // make_server_request(start);
 
-  // show the "it's the other player's turn right now" screen
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(0,0,1);
-  tft.printf("Waiting for your game to start...\n");
+  // // show the "it's the other player's turn right now" screen
+  // tft.fillScreen(TFT_BLACK);
+  // tft.setCursor(0,0,1);
+  // tft.printf("Waiting for your game to start...\n");
 
-  time_since_turn_check = millis();
+  // time_since_turn_check = millis();
 }
 
 void loop() {
@@ -286,8 +286,4 @@ void loop() {
   else if(battle_state==3) {
     // you lost/you won state. revert to status quo now!
   }
-
-  old_b1_input = b1;
-  old_b2_input = b2;
-  old_b3_input = b3;
 }
