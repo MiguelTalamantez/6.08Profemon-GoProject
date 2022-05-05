@@ -1358,7 +1358,7 @@ void make_server_request(int type) {
   if(type == start) {
     // send a POST request_buffer labeled "start" with the player_id and prof_id
     strcpy(request_buffer, "");
-    strcpy(prof_id, "Erik Demaine");
+    strcpy(profemon_id, "Erik Demaine");
     request_buffer[0] = '\0';
     offset = 0;
     offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=start&player_id=%s&prof_id=%s  HTTP/1.1\r\n",user,profemon_id);
