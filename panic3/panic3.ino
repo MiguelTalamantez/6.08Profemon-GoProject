@@ -653,7 +653,7 @@ void setup() {
 
 
 void loop() {
-  Serial.println(overallstate);
+//   Serial.println(overallstate);
   //READ DATA
     uint8_t button1 = digitalRead(BUTTON1);
     uint8_t button2 = digitalRead(BUTTON2); 
@@ -776,7 +776,7 @@ void loop() {
 
                 Serial.println(profemon_name);
                 Serial.println(display_name);
-                change_display = 1;
+                // change_display = 1;
             }
             
           }
@@ -806,7 +806,7 @@ void loop() {
               //Serial.println("Bootleg text: do you want to catch them? Yes=Button1, No=Button2");
               //Serial.println("PROFEMON DETECTED");
           } else {
-              Serial.println("IDLE");
+            //   Serial.println("IDLE");
           }
       }
 
@@ -1358,6 +1358,7 @@ void make_server_request(int type) {
   if(type == start) {
     // send a POST request_buffer labeled "start" with the player_id and prof_id
     strcpy(request_buffer, "");
+    strcpy(prof_id, "Erik Demaine");
     request_buffer[0] = '\0';
     offset = 0;
     offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=start&player_id=%s&prof_id=%s  HTTP/1.1\r\n",user,profemon_id);
