@@ -562,6 +562,7 @@ const int BUFFER2 = 3;
 int idx;
 // int offset;
 int firsttime;
+bool first_print = true;
 
 void setup()
 {
@@ -841,12 +842,20 @@ void loop()
         {
             if (button3 == 0)
             {
+                if (first_print) {
+                    tft.fillScreen(TFT_BLACK);
+                    first_print = false;
+                }
                 tft.printf("Player %s is nearby...\nWould you like to fight them?\n\nYES: Button 1\nNO: Button 2\n", display_name);
                 battle_or_catch = true;
                 // if other player nearby to battle
             }
             else if (strlen(profemon_name) != 0 && strlen(display_name) != 0)
             {
+                if (first_print) {
+                    tft.fillScreen(TFT_BLACK);
+                    first_print = false;
+                }
                 tft.printf("There is a %s nearby...\nWould you like to catch them?\n\nYES: Button 1\nNO: Button 2\n", display_name);
                 // Serial.println("Bootleg text: do you want to catch them? Yes=Button1, No=Button2");
                 // Serial.println("PROFEMON DETECTED");
@@ -1844,6 +1853,7 @@ void update_idle_mode(int in1, int in2)
                 change_display = 1;
                 new_profemon = 1;
             }
+            first_print = true;
             idle_state = Idle;
         }
         break;
