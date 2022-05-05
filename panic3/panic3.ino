@@ -842,7 +842,8 @@ void loop()
         {
             if (button3 == 0)
             {
-                if (first_print) {
+                if (first_print)
+                {
                     tft.fillScreen(TFT_BLACK);
                     first_print = false;
                 }
@@ -852,7 +853,8 @@ void loop()
             }
             else if (strlen(profemon_name) != 0 && strlen(display_name) != 0)
             {
-                if (first_print) {
+                if (first_print)
+                {
                     tft.fillScreen(TFT_BLACK);
                     first_print = false;
                 }
@@ -1115,7 +1117,38 @@ void do_http_request(char *host, char *request, char *response, uint16_t respons
         { // read out remaining text (body of response)
             char_append(response, client2.read(), OUT_BUFFER_SIZE);
         }
-        if (serial)
+        int try_counter = 0;
+        while (strncmp(response, "There was an error:<pre>[Errno 24]", 34) == 0)
+        {
+            if (serial)
+                Serial.print(request); // Can do one-line if statements in C without curly braces
+            client2.print(request);
+            memset(response, 0, response_size); // Null out (0 is the value of the null terminator '\0') entire buffer
+            uint32_t count = millis();
+            while (client2.connected())
+            { // while we remain connected read out data coming back
+                client2.readBytesUntil('\n', response, response_size);
+                if (serial)
+                    Serial.println(response);
+                if (strcmp(response, "\r") == 0)
+                { // found a blank line!
+                    break;
+                }
+                memset(response, 0, response_size);
+                if (millis() - count > response_timeout)
+                    break;
+            }
+            memset(response, 0, response_size);
+            count = millis();
+            while (client2.available())
+            { // read out remaining text (body of response)
+                char_append(response, client2.read(), OUT_BUFFER_SIZE);
+            }
+            try_counter++;
+            if (try_counter > 5) {
+                break;
+            }
+        }        if (serial)
             Serial.println(response);
         client2.stop();
         if (serial)
@@ -1162,6 +1195,39 @@ void do_https_request(char *host, char *request, char *response, uint16_t respon
         { // read out remaining text (body of response)
             char_append(response, client.read(), OUT_BUFFER_SIZE);
         }
+        int try_counter = 0;
+        while (strncmp(response, "There was an error:<pre>[Errno 24]", 34) == 0)
+        {
+            if (serial)
+                Serial.print(request); // Can do one-line if statements in C without curly braces
+            client.print(request);
+            response[0] = '\0';
+            // memset(response, 0, response_size); //Null out (0 is the value of the null terminator '\0') entire buffer
+            uint32_t count = millis();
+            while (client.connected())
+            { // while we remain connected read out data coming back
+                client.readBytesUntil('\n', response, response_size);
+                if (serial)
+                    Serial.println(response);
+                if (strcmp(response, "\r") == 0)
+                { // found a blank line!
+                    break;
+                }
+                memset(response, 0, response_size);
+                if (millis() - count > response_timeout)
+                    break;
+            }
+            memset(response, 0, response_size);
+            count = millis();
+            while (client.available())
+            { // read out remaining text (body of response)
+                char_append(response, client.read(), OUT_BUFFER_SIZE);
+            }
+            try_counter++;
+            if (try_counter > 5) {
+                break;
+            }
+        }
         if (serial)
             Serial.println(response);
         client.stop();
@@ -1183,9 +1249,9 @@ void start_battle()
     // select profemon // Yuebin's code
     tft.fillScreen(TFT_BLACK);
     tft.setCursor(0, 0);
+    strcpy(profemon_id, "Tristan Collins");
     tft.printf("You have chosen %s as your Prof-emon!\n", profemon_id);
     tft.printf("Loading...");
-
     num_turns = 0;
     battle_state = 0;
     make_server_request(start);
@@ -1486,7 +1552,6 @@ void make_server_request(int type)
     {
         // send a POST request_buffer labeled "start" with the player_id and prof_id
         strcpy(request_buffer, "");
-        strcpy(profemon_id, "Erik Demaine");
         request_buffer[0] = '\0';
         offset = 0;
         offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=start&player_id=%s&prof_id=%s  HTTP/1.1\r\n", user, profemon_id);
@@ -1500,7 +1565,7 @@ void make_server_request(int type)
         char *ptr = strtok(response_buffer, breaks);
 
         // Serial.printf("1: %s",ptr);
-        game_id = atoi(ptr);
+        game_id = 103;
         ptr = strtok(NULL, breaks);
 
         // Serial.printf("2: %s",ptr);
