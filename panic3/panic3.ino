@@ -871,6 +871,7 @@ void loop()
         if (button4 == 0)
         {
             overallstate = 9;
+            state = BUFFER;
             //   delay(500);
             //   Serial.println("It gets here");
         }
@@ -886,10 +887,11 @@ void loop()
 
     else if (overallstate == 9)
     {
-        switch_state(button1);
-        profedex_navigator(button2, button3);
-        if (button4 == 0)
-        {
+        Serial.println(state);
+        switch_state(button4);
+        if(state == VIEWING){
+            profedex_navigator(digitalRead(BUTTON2), digitalRead(BUTTON3));
+        } else if (state == IDLE) {
             overallstate = 0;
             Serial.println("It goes back to main");
             firsttime = 1;
@@ -948,6 +950,8 @@ void loop()
                     }
                     userlocationy = doc["location"]["lat"];
                     userlocationx = doc["location"]["lng"];
+                    latitude = doc["location"]["lat"];
+                    longitude = doc["location"]["lng"];
 
                     strcpy(request, "");
                     request[0] = '\0'; // set 0th byte to null
