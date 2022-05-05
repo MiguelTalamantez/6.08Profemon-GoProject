@@ -9,6 +9,9 @@
 #include <WiFiClientSecure.h>
 #include <WiFiClient.h>
 #include <ArduinoJson.h>
+#include <stdio.h>
+#include <cstring>
+
 TFT_eSPI tft = TFT_eSPI();  // Invoke library, pins defined in User_Setup.h
 MPU6050 imu; //imu object called, appropriately, imu
 
@@ -17,11 +20,20 @@ MPU6050 imu; //imu object called, appropriately, imu
   const int BUTTON2 = 39; //Button2 at pin 39
   const int BUTTON3 = 38; //Button3 at pin 38
   const int BUTTON4 = 34; //Button4 at pin 34
+  uint8_t button1; // for reading buttons
+  uint8_t button2;
+  uint8_t button3;
+  uint8_t button4;
+  uint8_t old_button1; // for storing old vals
+  uint8_t old_button2;
+  uint8_t old_button3;
+  uint8_t old_button4;
 
 //State machine variables
   int overallstate = 0;
   int mapstate = 0;
   int catchstate = 0;
+  bool battle_or_catch = false; // battle = true, catch = false
 
 //Miscl variables
   bool displaytext = true;
@@ -399,6 +411,11 @@ MPU6050 imu; //imu object called, appropriately, imu
   byte bssid[] = {0x04, 0x95, 0xE6, 0xAE, 0xDB, 0x41}; //6 byte MAC address of AP you're targeting.
   int offset = 0;
 
+//   const char AUDIO_PREFIX[] = "{\"config\":{\"encoding\":\"MULAW\",\"sampleRateHertz\":8000,\"languageCode\": \"en-US\",\"speechContexts\":[{\"phrases\":[\"riemann\", \"jacobian\"]}]}, \"audio\": {\"content\":\"";
+//   const char AUDIO_SUFFIX[] = "\"}}"; //suffix to POST request_buffer
+//   const int AUDIO_IN = 1; //pin where microphone is connected
+
+
 //WIFI-Related **Global Variables**
   uint8_t button_state; //used for containing button state and detecting edges
   int old_button_state; //used for detecting button edges
@@ -460,6 +477,64 @@ char* begin_profedex = 0;
 double latitude = 0.0;
 double longitude = 0.0;
 uint32_t loc_timer = 0;
+
+// audio variables
+// const int DELAY = 1000;
+// const int SAMPLE_FREQ = 8000;                          // Hz, telephone sample rate
+// const int SAMPLE_DURATION = 5;                        // duration of fixed sampling (seconds)
+// const int NUM_SAMPLES = SAMPLE_FREQ * SAMPLE_DURATION;  // number of of samples
+// const int ENC_LEN = (NUM_SAMPLES + 2 - ((NUM_SAMPLES + 2) % 3)) / 3 * 4;  // Encoded length of clip
+// bool conn;
+// uint32_t time_since_sample;      // used for microsecond timing
+// char speech_data[ENC_LEN + 200] = {0}; //global used for collecting speech data
+// char heard[200];
+
+// overall battle variables
+uint8_t b1;
+uint8_t b2;
+uint8_t b3;
+uint8_t old_b1_input;
+uint8_t old_b2_input;
+uint8_t old_b3_input;
+
+uint8_t num_turns;
+
+uint8_t gesture;
+uint8_t battle_state;
+
+char profemon_id[50];
+uint8_t game_id;
+char standard_move_name[50];
+char special_move_name[50];
+
+uint8_t old_player_hp;
+uint8_t player_hp;
+uint8_t other_hp;
+uint8_t max_attack;
+char last_move[50];
+uint8_t damage_done;
+
+uint32_t time_since_turn_check; 
+const uint32_t turn_check_period = 500;
+uint32_t time_since_turn_started;
+const uint32_t max_turn_length = 300000;
+
+const uint8_t start = 0;
+const uint8_t turn = 1;
+const uint8_t attack = 2;
+const uint8_t forfeit = 3;
+
+// gesture recognition variables
+int gesture_duration = 5000;
+
+int battlemode;
+const int x_shake = 1;
+const int y_shake = 2;
+const int z_shake = 3;
+
+int start_time;
+
+int gesture_total;
 
 //PROFEDEX Variables
 int state;
@@ -694,7 +769,11 @@ void loop() {
       
       update_idle_mode(digitalRead(BUTTON1), digitalRead(BUTTON2));
       if (idle_state == Idle) {
-          if (strlen(profemon_name) != 0 && strlen(display_name) != 0) {
+          if (button3 == 0) {
+              tft.printf("Player %s is nearby...\nWould you like to fight them?\n\nYES: Button 1\nNO: Button 2\n", display_name);
+              battle_or_catch = true;
+            // if other player nearby to battle
+          } else if (strlen(profemon_name) != 0 && strlen(display_name) != 0) {
               tft.printf("There is a %s nearby...\nWould you like to catch them?\n\nYES: Button 1\nNO: Button 2\n", display_name);
               //Serial.println("Bootleg text: do you want to catch them? Yes=Button1, No=Button2");
               //Serial.println("PROFEMON DETECTED");
@@ -705,8 +784,8 @@ void loop() {
 
     if (button4 == 0){
       overallstate = 9;
-      delay(500);
-      Serial.println("It gets here");
+    //   delay(500);
+    //   Serial.println("It gets here");
     }
   }
 
@@ -810,6 +889,10 @@ void loop() {
   
 
   overallstatefunction(button1, button2, button3, button4);
+  old_button1 = button1;
+  old_button2 = button2;
+  old_button3 = button3;
+  old_button4 = button4;
 }
 
 void overallstatefunction(uint8_t button1, uint8_t button2, uint8_t button3, uint8_t button4){
@@ -850,24 +933,27 @@ void overallstatefunction(uint8_t button1, uint8_t button2, uint8_t button3, uin
       //Display nice UI graphics 
       overallstate = 6;
       displaytext = true;
+      start_battle();
+      battle_state = 0;
       Serial.println("State 5");
       break;
     case(6):
       //Fight Mode
+      update_battle_mode(button1, button2, button3, old_button1, old_button2, old_button3);
       break;
-    case(7):
-      //Display nice UI graphics that say YOU LOST
-      Serial.println("YOU LOST");
-      overallstate = 0;
-      displaytext = true;
-      Serial.println("State 7");
-      break;
-    case(8):
-      Serial.println("YOU WON");
-      overallstate = 0;
-      displaytext = true;
-      Serial.println("State 8");
-      break;
+    // case(7):
+    //   //Display nice UI graphics that say YOU LOST
+    //   Serial.println("YOU LOST");
+    //   overallstate = 0;
+    //   displaytext = true;
+    //   Serial.println("State 7");
+    //   break;
+    // case(8):
+    //   Serial.println("YOU WON");
+    //   overallstate = 0;
+    //   displaytext = true;
+    //   Serial.println("State 8");
+    //   break;
     case(9):
       break;
   }
@@ -967,6 +1053,601 @@ void do_https_request(char* host, char* request, char* response, uint16_t respon
     client.stop();
   }
 }
+
+void start_battle() {
+  // select profemon // Yuebin's code
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(0,0);
+  tft.printf("You have chosen %s as your Prof-emon!\n",profemon_id);
+  tft.printf("Loading...");
+
+  num_turns = 0;
+  battle_state = 0;
+  make_server_request(start);
+  delay(1000);
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(0,0);
+  tft.printf("Waiting for your game to start...\n");
+  time_since_turn_check = millis();
+}
+
+void update_battle_mode(int in1, int in2, int in3, int old1, int old2, int old3) {
+  if(battle_state==0) {
+    // waiting for it to be our move. every [time period], we send a GET request_buffer labeled "turn" to ask whose turn it is
+    if(millis()-time_since_turn_check > turn_check_period) {
+      make_server_request(turn);
+    }
+
+    // if it's our turn, the function changed state to 1. we need to update the hp values, the screen (depends on whether the second move can be used yet), and the state value
+    if(battle_state==1) {
+      // if the other player suddenly has hp zero, they forfeited, so you win! yay!
+      if(other_hp==0) {
+        Serial.println("they lost :D");
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(0,0);
+        tft.printf("Your opponent has FORFEITED!\n\n");
+        tft.printf("%s hp: %u\n",profemon_id,player_hp);
+        tft.printf("Your opponent hp: 0\n");
+        tft.printf("Congratulations, you won!\n");
+        Serial.printf("state is now 3\n");
+        battle_state = 2;
+      }
+
+      // if YOUR hp is zero, you lost! shit!
+      else if(player_hp==0) {
+        Serial.printf("oopsie doopsie");
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(0,0);
+        tft.printf("Your opponent used %s!\nIt was super effective!\n\n",last_move);
+        tft.printf("%s hp: %u\n",profemon_id,player_hp);
+        tft.printf("Your opponent hp: %u\n",other_hp);
+
+        tft.printf("Unfortunately, you lost! Better luck next time.\n");
+        Serial.printf("state is now 3\n");
+        battle_state = 2;
+      }
+
+      // otherwise, it was just a normal move -- time to start our move
+      else {
+        Serial.printf("time to start the move\n");
+        num_turns++;
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(0,0);
+        // if their attack did less damage than a third of our attack value, it's considered "not very effective" (by our standards)
+        if(old_player_hp-player_hp>0 && old_player_hp-player_hp<(int)((double)max_attack/3.0)) {
+          tft.printf("Your opponent used %s with damage %u!\nIt was not very effective.\n\n",last_move,(old_player_hp-player_hp));
+        }
+        // otherwise, solid attack!
+        else if(old_player_hp-player_hp>0){
+          tft.printf("Your opponent used %s with damage %u!\n\n",last_move,(old_player_hp-player_hp));
+        }
+        else {
+          tft.printf("Your turn!\n\n");
+        }
+        
+        tft.printf("%s hp: %u\n",profemon_id,player_hp);
+        tft.printf("Your opponent hp: %u\n\n",other_hp);
+
+        tft.printf("Choose a move!\n");
+        tft.printf("Standard attack: %s\n",standard_move_name);
+        if(num_turns>2) {
+          tft.printf("Special attack: %s\n",special_move_name);
+        }
+        tft.printf("Press the third button to forfeit the match.");
+
+        time_since_turn_started = millis();
+      }
+    }
+  }
+  else if(battle_state==1) {
+    // okay, it's now our turn, so we're going to wait for a button to be pressed
+
+    // if the first button is pressed, they want to do the gesture
+    if(old1!=in1 && in1==1) {
+      tft.fillScreen(TFT_BLACK);
+      tft.setCursor(0,0);
+      tft.printf("You have selected the move %s. To perform this move, follow the instructions.\n",standard_move_name);
+      start_time = millis();
+      // calculate the amount of damage done and send it over
+      damage_done = battle_direction(gesture);
+      memset(last_move,0,50);
+      strcpy(last_move,standard_move_name);
+      
+      make_server_request(attack);
+      //make_server_request(turn);
+
+      // if the other player's new hp is zero, you win! yay!
+      if(other_hp-damage_done<1) {
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(0,0);
+        tft.printf("You used %s with %u damage! It was super effective!\n\n",last_move,damage_done);
+        tft.printf("%s hp: %u\n",profemon_id,player_hp);
+        tft.printf("Your opponent hp: 0\n\n");
+
+        tft.printf("Your opponent has fainted!\nCongratulations, you won!\n");
+        Serial.printf("state is now 3\n");
+        battle_state = 2;
+      }
+
+      // otherwise, standard message, and back to checking when our move begins
+      else {
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(0,0);
+        if(damage_done>(int)(3.0*(double)max_attack/4.0)) {
+          tft.printf("You used %s with %u damage! It was super effective!\n\n",last_move,damage_done);
+        }
+        else if(damage_done<(int)((double)max_attack/3.0)){
+          tft.printf("You used %s with %u damage! It was not very effective.\n\n",last_move,damage_done);
+        }
+        else {
+          tft.printf("You used %s with %u damage!\n\n",last_move,damage_done);
+        }
+        tft.printf("%s hp: %u\n",profemon_id,player_hp);
+        tft.printf("Your opponent hp: %u\n",other_hp-damage_done);
+
+        tft.printf("Waiting");
+        delay(100);
+        tft.printf(".");
+        delay(100);
+        tft.printf(".");
+        delay(100);
+        tft.printf(".\n");
+
+        old_player_hp = player_hp;
+        Serial.printf("state is now 0\n");
+        battle_state = 0;
+        time_since_turn_check = millis();
+      }
+    }
+
+    // if the second button is pressed, they want to do the voice recognition
+    else if(num_turns>2 && old2!=in2 && in2==1) {
+      Serial.println("you have selected the SPECIAL move");
+      tft.fillScreen(TFT_BLACK);
+      tft.setCursor(0,0);
+      tft.printf("You have selected the move %s.\n",special_move_name);
+      tft.printf("Get ready to shout in...\n");
+      tft.printf("3\n");
+      delay(500);
+      tft.printf("2\n");
+      delay(500);
+      tft.printf("1\n");
+      delay(500);
+      tft.printf("Speak!\n");
+
+      // voice recognition goes here. they have three chances, or they do zero damage
+      int i=0;
+    //   while(i<3) {
+    //     // hear_command();
+
+    //     Serial.printf("supposedly, |%s| and |%s| are super different /s\n",heard,special_move_name);
+    //     //Serial.printf("and the difference between them is %d or maybe %d\n",strncmp(heard,special_move_name,strlen(special_move_name)),strcmp(heard,special_move_name));
+    //     if(strncmp(heard,special_move_name,strlen(special_move_name))==0) {
+    //       break;
+    //     }
+    //     else {
+    //       tft.fillScreen(TFT_BLACK);
+    //       tft.setCursor(0,0);
+    //       tft.printf("Try again!\n");
+    //       tft.printf("Get ready to shout %s in...\n",special_move_name);
+    //       tft.printf("3\n");
+    //       delay(500);
+    //       tft.printf("2\n");
+    //       delay(500);
+    //       tft.printf("1\n");
+    //       delay(500);
+    //       tft.printf("Speak!\n");
+    //     }
+
+    //     i++;
+    //   }
+
+      if(i<3) {
+        damage_done = max_attack;
+      }
+      else {
+        damage_done = 0;
+      }
+
+      // calculate the amount of damage done and send it over. if the other player's new hp is zero, you win! yay!
+
+      memset(last_move,0,50);
+      strcpy(last_move,special_move_name);
+
+      make_server_request(attack);
+      //make_server_request(turn);
+
+      if(other_hp-damage_done<1) {
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(0,0);
+        tft.printf("You used %s with %u damage! It was super effective!\n\n",last_move,damage_done);
+        tft.printf("%s hp: %u\n",profemon_id,player_hp);
+        tft.printf("Your opponent hp: 0\n\n");
+
+        tft.printf("Your opponent has fainted!\nCongratulations, you won!\n");
+        Serial.printf("state is now 3\n");
+        battle_state = 2;
+      }
+
+      // otherwise, standard message, and back to checking when our move begins
+      else {
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(0,0);
+        if(damage_done>(int)(3.0*(double)max_attack/4.0)) {
+          tft.printf("You used %s with %u damage! It was super effective!\n\n",last_move,damage_done);
+        }
+        else if(damage_done<(int)((double)max_attack/3.0)){
+          tft.printf("You used %s with %u damage! It was not very effective.\n\n",last_move,damage_done);
+        }
+        else {
+          tft.printf("You used %s with %u damage!\n\n",last_move,damage_done);
+        }
+        tft.printf("%s hp: %u\n",profemon_id,player_hp);
+        tft.printf("Your opponent hp: %u\n",other_hp-damage_done);
+
+        tft.printf("Waiting for your opponent");
+        delay(100);
+        tft.printf(".");
+        delay(100);
+        tft.printf(".");
+        delay(100);
+        tft.printf(".");
+
+        old_player_hp = player_hp;
+        Serial.printf("state is now 0\n");
+        battle_state = 0;
+        time_since_turn_check = millis();
+      }
+    }
+    
+    // if the third button is pressed, or they haven't done anything in five minutes, they forfeit the match
+    else if((old3!=in3 && in3==1) || (millis()-time_since_turn_started>max_turn_length)) {
+      Serial.println("you have FORFEITED the match :(");
+      // how does that work, you may ask? send a POST request_buffer with the game_id and your player_id labeled "forfeit"
+      make_server_request(forfeit);
+      tft.fillScreen(TFT_BLACK);
+      tft.setCursor(0,0);
+      tft.printf("You have FORFEITED!\n\n");
+      tft.printf("Better luck next time :(\n");
+      Serial.printf("state is now 3\n");
+      battle_state = 2;
+    }
+
+    else if(battle_state==2) {
+      battle_state = 0;
+      overallstate = 0;
+    }
+
+  }
+}
+
+void make_server_request(int type) {
+  strcpy(request_buffer, "");
+  request_buffer[0] = '\0'; //set 0th byte to null
+  offset = 0; //reset offset variable for sprintf-ing
+  
+  if(type == start) {
+    // send a POST request_buffer labeled "start" with the player_id and prof_id
+    strcpy(request_buffer, "");
+    request_buffer[0] = '\0';
+    offset = 0;
+    offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=start&player_id=%s&prof_id=%s  HTTP/1.1\r\n",user,profemon_id);
+    offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+
+    // info to store: game_id, gesture, our own hp (as both player_hp and old_player_hp)
+    char breaks[2];
+    breaks[0] = ',';
+    breaks[1] = '\0';
+    char* ptr = strtok(response_buffer, breaks);
+
+    //Serial.printf("1: %s",ptr);
+    game_id = atoi(ptr);
+    ptr = strtok (NULL, breaks);
+
+    //Serial.printf("2: %s",ptr);
+    gesture = atoi(ptr);
+    ptr = strtok (NULL, breaks);
+
+    //Serial.printf("3: %s",ptr);
+    player_hp = atoi(ptr);
+    old_player_hp = player_hp;
+
+    Serial.printf("GAME HAS BEGUN! id is %u\n",game_id);
+
+    // send a GET request_buffer to profedex.py asking for attack
+    strcpy(request_buffer, "");
+    request_buffer[0] = '\0';
+    offset = 0;
+    offset += sprintf(request_buffer + offset, "GET http://608dev-2.net/sandbox/sc/team3/profedex.py?professor=%s&item=attack  HTTP/1.1\r\n",profemon_id);
+    offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+
+    // info to store: our own attack value
+    max_attack = atoi(response_buffer);
+
+    Serial.printf("max attack score is: %u\n",max_attack);
+
+    // send ANOTHER request_buffer to figure out what your prof-emon's two moves are
+    strcpy(request_buffer, "");
+    request_buffer[0] = '\0';
+    offset = 0;
+    offset += sprintf(request_buffer + offset, "GET http://608dev-2.net/sandbox/sc/team3/profedex.py?professor=%s&item=moves  HTTP/1.1\r\n",profemon_id);
+    offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+
+    char* ending1 = strrchr(response_buffer, '\n');
+    *(ending1 + 0) = NULL;
+
+    //Serial.printf("%s\n",response);
+
+    // info to store: the two moves
+    ptr = strtok(response_buffer, breaks);
+    
+    memset(standard_move_name,0,50);
+    strcpy(standard_move_name,ptr);
+    ptr = strtok (NULL, breaks);
+
+    memset(special_move_name,0,50);
+    strcpy(special_move_name,ptr);
+
+    Serial.printf("The real moves are %s and %s\n", standard_move_name,special_move_name);
+  }
+  else if(type == turn) {
+    // send a GET request_buffer labeled "turn" with the game_id and player_id
+    offset += sprintf(request_buffer + offset, "GET http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=turn&player_id=%s&game_id=%u  HTTP/1.1\r\n",user,game_id);
+    offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+
+    // if the response is just "-1", the game hasn't started yet, and we should just keep waiting for the other player to enter the game
+    if(strncmp(response_buffer,"-1",2)==0) {
+      return;
+    }
+
+    else if(battle_state==1) {
+      Serial.printf("at the time, the turn is %s\n",response_buffer);
+    }
+
+    // info to store: the id of whose turn it is, our own hp, the other player's hp, and the last move
+    char breaks[2];
+    breaks[0] = ',';
+    breaks[1] = '\0';
+    char* ptr = strtok(response_buffer, breaks);
+    
+    if(strcmp(ptr,user)==0) {
+      Serial.printf("state is now 1\n");
+      battle_state = 1;
+    }
+
+    ptr = strtok (NULL, breaks);
+    player_hp = atoi(ptr);
+
+    ptr = strtok (NULL, breaks);
+    other_hp = atoi(ptr);
+
+    ptr = strtok (NULL, breaks);
+    if(strncmp(response_buffer,"n/a",3)==0) {
+      memset(last_move,0,50);
+    }
+    else {
+      memset(last_move,0,50);
+      strcpy(last_move,ptr);
+    }
+
+    // Serial.printf("this will never be reached :/");
+  }
+  else if(type == attack) {
+    // send a POST request_buffer labeled "attack" with the game_id, player_id, move, and damage
+    strcpy(request_buffer, "");
+    request_buffer[0] = '\0';
+    offset = 0;
+    offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=attack&player_id=%s&game_id=%u&move=%s&damage=%u  HTTP/1.1\r\n",user,game_id,last_move,damage_done);
+    offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
+    Serial.printf("sending an attack request_buffer with url %s\n",request_buffer);
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+    Serial.printf("request_buffer has been sent\n");
+  }
+  else if(type == forfeit) {
+    // send a POST request_buffer labeled "forfeit" with the game_id and player_id
+    strcpy(request_buffer, "");
+    request_buffer[0] = '\0';
+    offset = 0;
+    offset += sprintf(request_buffer + offset, "POST http://608dev-2.net/sandbox/sc/team3/battle_brain.py?label=forfeit&player_id=%s&game_id=%u  HTTP/1.1\r\n",user,game_id);
+    offset += sprintf(request_buffer + offset, "Host: 608dev-2.net\r\n\r\n");
+    do_http_request("608dev-2.net", request_buffer, response_buffer, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+  }
+}
+
+int battle_direction(int what_to_do){
+  battlemode = what_to_do;
+  gesture_total = 0;
+  switch(battlemode){
+    case x_shake:
+    tft.println("SHAKE LEFT AND RIGHT");
+      while((millis() - start_time) < gesture_duration){
+        imu.readAccelData(imu.accelCount);
+        x = abs(ZOOM * imu.accelCount[0] * imu.aRes);
+
+        x_avg = (x + x_old + x_older) / 3.0;
+        x_older = x_old;
+        x_old = x;
+        
+        // char output[100];
+        // sprintf(output,"X:%4.2f", x_avg); 
+        // Serial.println(output);
+
+        if(x_avg > 6){
+          gesture_total += 1;
+        }
+      }
+      break;
+    case y_shake:
+      tft.println("SHAKE UP AND DOWN");
+      while((millis() - start_time) < gesture_duration){
+        imu.readAccelData(imu.accelCount);
+        y = abs(ZOOM * imu.accelCount[1] * imu.aRes);
+
+        y_avg = (y + y_old + y_older) / 3.0;
+        y_older = y_old;
+        y_old = y;
+
+        // char output[100];
+        // sprintf(output,"Y:%4.2f", y_avg); 
+        // Serial.println(output);
+
+        if(y_avg > 12){
+          gesture_total += 1;
+        }
+      }
+      break;
+    case z_shake:
+      tft.println("SHAKE FORWARD AND BACK");
+      while((millis() - start_time) < gesture_duration){
+        imu.readAccelData(imu.accelCount);
+        z = abs(ZOOM * imu.accelCount[2] * imu.aRes);
+
+        z_avg = (z + z_old + z_older) / 3.0;
+        z_older = z_old;
+        z_old = z;
+
+        //char output[100];
+        //sprintf(output,"Z:%4.2f", z_avg); 
+        //Serial.println(output);
+
+        if(z_avg > 6){
+          gesture_total += 1;
+        }
+      }
+      break;
+  }
+
+  return (gesture_total*max_attack/2500);
+}
+
+// void hear_command() {
+//   //Serial.println("listening...");
+//   record_audio();
+//   //Serial.println("sending...");
+//   //Serial.print("\nStarting connection to server...");
+//   delay(300);
+//   conn = false;
+//   for (int i = 0; i < 10; i++) {
+//     int val = (int)client2.connect("speech.google.com", 443, 4000);
+//     Serial.print(i); Serial.print(": "); Serial.println(val);
+//     if (val != 0) {
+//       conn = true;
+//       break;
+//     }
+//     Serial.print(".");
+//     delay(300);
+//   }
+//   if (!conn) {
+//     Serial.println("Connection failed!");
+//     return;
+//   }
+//   else {
+//     Serial.println("Connected to server!");
+//     Serial.println(client2.connected());
+//     int len = strlen(speech_data);
+//     // Make a HTTP request_buffer:
+//     client2.print("POST /v1/speech:recognize?key="); client2.print(API_KEY); client2.print(" HTTP/1.1\r\n");
+//     client2.print("Host: speech.googleapis.com\r\n");
+//     client2.print("Content-Type: application/json\r\n");
+//     client2.print("cache-control: no-cache\r\n");
+//     client2.print("Content-Length: "); client2.print(len);
+//     client2.print("\r\n\r\n");
+//     int ind = 0;
+//     int jump_size = 1000;
+//     char temp_holder[jump_size + 10] = {0};
+//     Serial.println("sending data");
+//     while (ind < len) {
+//       delay(80);//experiment with this number!
+//       //if (ind + jump_size < len) client.print(speech_data.substring(ind, ind + jump_size));
+//       strncat(temp_holder, speech_data + ind, jump_size);
+//       client2.print(temp_holder);
+//       ind += jump_size;
+//       memset(temp_holder, 0, sizeof(temp_holder));
+//     }
+//     client2.print("\r\n");
+//     //Serial.print("\r\n\r\n");
+//     //Serial.println("Through send...");
+//     unsigned long count = millis();
+//     while (client2.connected()) {
+//       //Serial.println("IN!");
+//       String line = client2.readStringUntil('\n');
+//       Serial.print(line);
+//       if (line == "\r") { //got header of response
+//         //Serial.println("headers received");
+//         break;
+//       }
+//       if (millis() - count > RESPONSE_TIMEOUT) break;
+//     }
+//     //Serial.println("");
+//     //Serial.println("Response...");
+//     count = millis();
+//     while (!client2.available()) {
+//       delay(100);
+//       //Serial.print(".");
+//       if (millis() - count > RESPONSE_TIMEOUT) break;
+//     }
+//     Serial.println();
+//     //Serial.println("-----------");
+//     memset(response_buffer, 0, sizeof(response_buffer));
+//     while (client2.available()) {
+//       char_append(response_buffer, client2.read(), OUT_BUFFER_SIZE);
+//     }
+//     //Serial.println(response); //comment this out if needed for debugging
+//     char* trans_id = strstr(response_buffer, "transcript");
+//     char transcript[100] = {0};
+//     if (trans_id != NULL) {
+//       char* foll_coll = strstr(trans_id, ":");
+//       char* starto = foll_coll + 3; //starting index
+//       char* endo = strstr(starto + 1, "\""); //ending index
+//       int transcript_len = endo - starto;
+      
+//       strncat(transcript, starto, transcript_len);
+//       Serial.printf("We heard you say: %s\n",transcript);
+
+//       memset(heard,0,200);
+//       strcpy(heard,transcript);
+//     }
+//     //Serial.println("-----------");
+//     client2.stop();
+//     Serial.println("done");
+//   }
+// }
+
+// void record_audio() {
+//   int sample_num = 0;    // counter for samples
+//   int enc_index = strlen(AUDIO_PREFIX) - 1;  // index counter for encoded samples
+//   float time_between_samples = 1000000 / SAMPLE_FREQ;
+//   int value = 0;
+//   char raw_samples[3];   // 8-bit raw sample data array
+//   memset(speech_data, 0, sizeof(speech_data));
+//   sprintf(speech_data, "%s", AUDIO_PREFIX);
+//   char holder[5] = {0};
+//   Serial.println("starting");
+//   uint32_t text_index = enc_index;
+//   uint32_t start = millis();
+//   time_since_sample = micros();
+//   while (sample_num < NUM_SAMPLES) { //read in NUM_SAMPLES worth of audio data
+//     value = analogRead(AUDIO_IN);  //make measurement
+//     raw_samples[sample_num % 3] = mulaw_encode(value - 1800); //remove 1.5ishV offset (from 12 bit reading)
+//     sample_num++;
+//     if (sample_num % 3 == 0) {
+//       base64_encode(holder, raw_samples, 3);
+//       strncat(speech_data + text_index, holder, 4);
+//       text_index += 4;
+//     }
+//     // wait till next time to read
+//     while (micros() - time_since_sample <= time_between_samples); //wait...
+//     time_since_sample = micros();
+//   }  
+//   Serial.println(millis() - start);
+//   sprintf(speech_data + strlen(speech_data), "%s", AUDIO_SUFFIX);
+//   Serial.println("out");
+// }
+
 
 // State machine that changes when profemon is nearby
 // Transition from map state to catch state
