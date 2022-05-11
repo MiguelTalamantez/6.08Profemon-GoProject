@@ -2,6 +2,11 @@ from datetime import datetime
 import requests
 import random
 
+##################################################################################
+# Python script that returns profemon that are close enough to be caught, if any #
+##################################################################################
+
+
 def request_handler(request):
     if request['method']=='GET' :
         lat = float(request['values']['lat'])

@@ -2,6 +2,10 @@ import sqlite3
 
 database = "/var/jail/home/team3/profedex.db"
 
+#############################################################################################
+# Python script for viewing profemon in personal profedex in order to select one for battle #
+#############################################################################################
+
 def request_handler(request):
 
     if request['method'] == 'GET' and 'select' in request['args']:
