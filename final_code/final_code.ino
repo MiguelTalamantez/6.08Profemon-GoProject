@@ -1420,14 +1420,17 @@ void battle_prep_mode(int in1, int in2, int in3, int old1, int old2, int old3) {
 
         case BATTLE_READY:
             Serial.println("Made it here");
+            // button1 = digitalRead(BUTTON1);
+            // button2 = digitalRead(BUTTON2);
+            // button3 = digitalRead(BUTTON3);
 
-            if (button1 == 0 || button2 == 0)
+            if (in1 == 0 || in2 == 0)
             {
-                if (button2 == 0)
+                if (in2 == 0)
                 {
                     idx += 1;
                 }
-                if (button1 == 0)
+                if (in1 == 0)
                 {
                     idx -= 1;
                 }
@@ -1452,7 +1455,7 @@ void battle_prep_mode(int in1, int in2, int in3, int old1, int old2, int old3) {
                 Serial.println("-----------");
                 tft.println(response);
             }
-            if (button3 == 0)
+            if (in3 == 0)
             {
                 Serial.println("Here");
                 strcpy(request, "");
