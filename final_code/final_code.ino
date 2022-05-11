@@ -14,6 +14,7 @@
 
 TFT_eSPI tft = TFT_eSPI(); // Invoke library, pins defined in User_Setup.h
 MPU6050 imu;               // imu object called, appropriately, imu
+const int LOOP_PERIOD = 40;
 
 // Button Setup
 const int BUTTON1 = 45; // Button1 at pin 45
@@ -31,8 +32,6 @@ uint8_t old_button4;
 
 // State machine variables
 int overallstate = 0;
-//   int mapstate = 0;
-//   int catchstate = 0;
 bool battle_or_catch = false; // battle = true, catch = false
 
 // Miscl variables
@@ -480,7 +479,7 @@ uint32_t swing_times[30];
 bool swing_in_progress = false;
 
 // Game/Display Variables
-const char user[] = "Pikachu";
+const char user[] = "Pikachu"; //Annika
 uint8_t change_display = 0;
 uint8_t new_profemon = 0;
 char display_name[50] = "";
@@ -495,16 +494,34 @@ double latitude = 0.0;
 double longitude = 0.0;
 uint32_t loc_timer = 0;
 
-// audio variables
-// const int DELAY = 1000;
-// const int SAMPLE_FREQ = 8000;                          // Hz, telephone sample rate
-// const int SAMPLE_DURATION = 5;                        // duration of fixed sampling (seconds)
-// const int NUM_SAMPLES = SAMPLE_FREQ * SAMPLE_DURATION;  // number of of samples
-// const int ENC_LEN = (NUM_SAMPLES + 2 - ((NUM_SAMPLES + 2) % 3)) / 3 * 4;  // Encoded length of clip
-// bool conn;
-// uint32_t time_since_sample;      // used for microsecond timing
-// char speech_data[ENC_LEN + 200] = {0}; //global used for collecting speech data
-// char heard[200];
+// join battle variables
+char nearby[1000];
+char challenge[100];
+char yes_no[100];
+char bufferb[5];
+char profemon[500];
+
+// offsets and requests
+int index1; // offset for POST request Google API
+int index2; // offset for POST request get building
+int index3; // offset for POST request get nearby players
+int index4;
+int len; // body lengths
+
+// State Machine Constants
+uint8_t state1;
+uint8_t old_state1;
+uint8_t state2;
+uint8_t old_state2;
+uint8_t state3;
+uint8_t old_state3;
+uint8_t battle_prep_state;
+int accept = 0;
+int battle_timer;
+const uint8_t BATTLE_IDLE = 0;
+const uint8_t BATTLE_READY = 1;
+const uint8_t BATTLING = 2;
+int idx = 0;
 
 // overall battle variables
 uint8_t b1;
@@ -559,7 +576,7 @@ const int IDLE = 0;
 const int BUFFER = 1;
 const int VIEWING = 2;
 const int BUFFER2 = 3;
-int idx;
+// int idx;
 // int offset;
 int firsttime;
 bool first_print = true;
@@ -717,6 +734,9 @@ void loop()
     {
 
         // Display User on map + update location/profemon detection
+        if (millis() - userdisplaytimer > 2000) {
+            battle_prep_mode(button1, button2, button3, old_button1, old_button2, old_button3);
+        }
         if (millis() - userdisplaytimer > 10000)
         {
             Serial.println("Location Updating in map loop");
@@ -757,7 +777,7 @@ void loop()
                 offset += sprintf(request + offset, "cache-control: no-cache\r\n");
                 offset += sprintf(request + offset, "Content-Length: %d\r\n\r\n", len);
                 offset += sprintf(request + offset, "%s", json_body);
-                do_https_request(SERVER, request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+                do_https_request(SERVER, request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
                 Serial.println("-----------");
                 Serial.println(response);
                 Serial.println("-----------");
@@ -779,8 +799,14 @@ void loop()
                     latitude = doc["location"]["lat"];
                     longitude = doc["location"]["lng"];
 
+                    latitude = doc["location"]["lat"];
+                    longitude = doc["location"]["lng"];
+
                     strcpy(request, "");
+                    strcpy(response, "");
+
                     request[0] = '\0'; // set 0th byte to null
+                    response[0] = '\0'; // set 0th byte to null
                     offset = 0;        // reset offset variable for sprintf-ing
                     sprintf(json_body, "lat=%f&lon=%f\r\n", latitude, longitude);
                     Serial.println(json_body);
@@ -791,7 +817,7 @@ void loop()
                     offset += sprintf(request + offset, "Content-Length: %d\r\n\r\n", len);
                     offset += sprintf(request + offset, "%s", json_body);
                     Serial.println(request);
-                    do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+                    do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
                     Serial.println("-----------");
                     Serial.println(response);
                     Serial.println("-----------");
@@ -840,18 +866,7 @@ void loop()
         update_idle_mode(digitalRead(BUTTON1), digitalRead(BUTTON2));
         if (idle_state == Idle)
         {
-            if (button3 == 0)
-            {
-                if (first_print)
-                {
-                    tft.fillScreen(TFT_BLACK);
-                    first_print = false;
-                }
-                tft.printf("Player %s is nearby...\nWould you like to fight them?\n\nYES: Button 1\nNO: Button 2\n", display_name);
-                battle_or_catch = true;
-                // if other player nearby to battle
-            }
-            else if (strlen(profemon_name) != 0 && strlen(display_name) != 0)
+            if (overallstate < 5 && strlen(profemon_name) != 0 && strlen(display_name) != 0 && millis() - ask_timer > 15000)
             {
                 if (first_print)
                 {
@@ -859,12 +874,7 @@ void loop()
                     first_print = false;
                 }
                 tft.printf("There is a %s nearby...\nWould you like to catch them?\n\nYES: Button 1\nNO: Button 2\n", display_name);
-                // Serial.println("Bootleg text: do you want to catch them? Yes=Button1, No=Button2");
-                // Serial.println("PROFEMON DETECTED");
-            }
-            else
-            {
-                //   Serial.println("IDLE");
+                ask_timer = millis();
             }
         }
 
@@ -1031,6 +1041,7 @@ void overallstatefunction(uint8_t button1, uint8_t button2, uint8_t button3, uin
         Serial.println("State 0");
         break;
     case (5):
+        // pre-battle start mode
         // Display nice UI graphics
         overallstate = 6;
         displaytext = true;
@@ -1040,15 +1051,13 @@ void overallstatefunction(uint8_t button1, uint8_t button2, uint8_t button3, uin
         break;
     case (6):
         // Fight Mode
+        // Serial.println("Here");
         update_battle_mode(button1, button2, button3, old_button1, old_button2, old_button3);
         break;
-    // case(7):
-    //   //Display nice UI graphics that say YOU LOST
-    //   Serial.println("YOU LOST");
-    //   overallstate = 0;
-    //   displaytext = true;
-    //   Serial.println("State 7");
-    //   break;
+    case(7):
+        // battle prep and profemon choosing mode
+        battle_prep_mode(button1, button2, button3, old_button1, old_button2, old_button3);
+        break;
     // case(8):
     //   Serial.println("YOU WON");
     //   overallstate = 0;
@@ -1253,7 +1262,7 @@ void start_battle()
     // select profemon // Yuebin's code
     tft.fillScreen(TFT_BLACK);
     tft.setCursor(0, 0);
-    strcpy(profemon_id, "Tristan Collins");
+    // strcpy(profemon_id, "Tristan Collins");
     tft.printf("You have chosen %s as your Prof-emon!\n", profemon_id);
     tft.printf("Loading...");
     num_turns = 0;
@@ -1264,6 +1273,219 @@ void start_battle()
     tft.setCursor(0, 0);
     tft.printf("Waiting for your game to start...\n");
     time_since_turn_check = millis();
+}
+
+void battle_prep_mode(int in1, int in2, int in3, int old1, int old2, int old3) {
+    switch (battle_prep_state)
+        {
+
+        case BATTLE_IDLE:
+            // Get Building (Also updates location of user on database)
+            strcpy(request, "");
+            request[0] = '\0'; // set 0th byte to null
+            index2 = 0;        // reset offset variable for sprintf-ing
+            sprintf(json_body, "user=%s&lat=%f&lon=%f\r\n", user, latitude, longitude);
+            Serial.println(json_body);
+            len = strlen(json_body);
+            index2 += sprintf(request + index2, "POST http://608dev-2.net/sandbox/sc/team3/mil4/new_geolocation.py HTTP/1.1\r\n");
+            index2 += sprintf(request + index2, "Host: 608dev-2.net\r\n");
+            index2 += sprintf(request + index2, "Content-Type: application/x-www-form-urlencoded\r\n");
+            index2 += sprintf(request + index2, "Content-Length: %d\r\n\r\n", len);
+            index2 += sprintf(request + index2, "%s", json_body);
+            Serial.println(request);
+            do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+            Serial.println("-----------");
+            Serial.println(response);
+            Serial.println("-----------");
+            // tft.printf("Current Location:\n");
+            // tft.printf("Lat: %f  \n", latitude);
+            // tft.printf("Lon: %f  \n", longitude);
+            // tft.printf("%s    \n", response);
+
+            index3 = 0;
+            strcpy(request, "");
+            request[0] = '\0';
+            strcpy(response, "");
+            response[0] = '\0';
+            strcpy(nearby, "");
+            nearby[0] = '\0';
+            sprintf(nearby, "user=%s&lat=%f&lon=%f", user, latitude, longitude);
+            len = strlen(nearby);
+            index3 += sprintf(request + index3, "POST http://608dev-2.net/sandbox/sc/team3/mil4/new_vicinity.py HTTP/1.1\r\n");
+            index3 += sprintf(request + index3, "Host: 608dev-2.net\r\n");
+            index3 += sprintf(request + index3, "Content-Type: application/x-www-form-urlencoded\r\n");
+            index3 += sprintf(request + index3, "Content-Length: %d\r\n\r\n", len);
+            index3 += sprintf(request + index3, "%s", nearby);
+            Serial.println(request);
+            do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+            Serial.println(response);
+
+            // Check to move to next state
+            len = strcmp(response, "none"); // NOTE: ADD \n
+            if (strcmp(response, "none\n") != 0)
+            { // there is someone within vicinity
+                overallstate = 7;
+                Serial.printf("here: %d\n", len);
+
+                len = strlen(response);
+                response[len - 1] = '\0';
+                index4 = 0;
+                strcpy(request, "");
+                Serial.println("up");
+                request[0] = '\0';
+                Serial.println("here");
+                strcpy(challenge, "");
+                challenge[0] = '\0';
+                Serial.println("there");
+
+                index4 += sprintf(request + index4, "GET http://608dev-2.net/sandbox/sc/team3/mil4/battling_modes.py?user=%s&opp=%s HTTP/1.1\r\n", user, response);
+                index4 += sprintf(request + index4, "Host: 608dev-2.net\r\n\r\n");
+                Serial.println(request);
+                do_http_request("608dev-2.net", request, challenge, 100, RESPONSE_TIMEOUT, true);
+                strcpy(request, "");
+                Serial.printf("Challenge: %s\n", challenge);
+
+                if (strcmp(challenge, "ready\n") == 0)
+                { // battle mode is ready
+                    Serial.println("in here");
+                    tft.fillScreen(TFT_BLACK);
+                    tft.printf("Closest user: %s\n", response);
+                    if (strcmp(response, "none") != 0) {
+                      tft.printf("%s is within vicinity!\nWould you like to challenge them?", response);
+                      tft.printf("Button 1: Yes\nButton 2: No");
+                    }
+                    // Press button1 for yes and button2 for no
+                    battle_timer = millis();
+                    strcpy(bufferb, "");
+                    bufferb[0] = '\0';
+                    while (millis() - battle_timer < 30000 && accept == 0)
+                    {
+                        button1 = digitalRead(BUTTON1);
+                        button2 = digitalRead(BUTTON2);
+                        Serial.println("reading button");
+                        if (button1 == 0)
+                        {
+                            accept = 1;
+                            Serial.println("MADE IT TO YES");
+                            sprintf(bufferb, "yes");
+                        }
+                        if (button2 == 0)
+                        {
+                            Serial.println("made it to no");
+                            accept = 2;
+                            sprintf(bufferb, "no");
+                        }
+                    }
+                    if (strlen(bufferb) == 0) {
+                        break;
+                    }
+                    index4 = 0;
+                    strcpy(request, "");
+                    request[0] = '\0';
+                    strcpy(yes_no, "");
+                    yes_no[0] = '\0';
+                    strcpy(response, "");
+                    response[0] = '\0';
+                    Serial.printf("yes or no: %s\n", bufferb);
+                    sprintf(yes_no, "user=%s&opp=%s&play=%s", user, response, bufferb);
+                    len = strlen(yes_no);
+                    index4 += sprintf(request + index4, "POST http://608dev-2.net/sandbox/sc/team3/mil4/battling_modes.py HTTP/1.1\r\n", user, response);
+                    index4 += sprintf(request + index4, "Host: 608dev-2.net\r\n");
+                    index4 += sprintf(request + index4, "Content-Type: application/x-www-form-urlencoded\r\n");
+                    index4 += sprintf(request + index4, "Content-Length: %d\r\n\r\n", len);
+                    index4 += sprintf(request + index4, "%s", yes_no);
+                    Serial.println(request);
+                    do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, true);
+                    Serial.println("We made it to yes");
+                    Serial.println(response);
+
+                    if (strcmp(response, "no\n") == 0)
+                    {
+                        Serial.println("Here");
+                        battle_prep_state = BATTLE_READY;
+                        overallstate = 7;
+                    }
+                }
+                else
+                {
+                    overallstate = 0;
+                    // tft.printf("Closest user: %s", response);
+                }
+            }
+            else
+            {
+                overallstate = 0;
+            }
+            break;
+
+        case BATTLE_READY:
+            Serial.println("Made it here");
+            // button1 = digitalRead(BUTTON1);
+            // button2 = digitalRead(BUTTON2);
+            // button3 = digitalRead(BUTTON3);
+
+            if (in1 == 0 || in2 == 0)
+            {
+                if (in2 == 0)
+                {
+                    idx += 1;
+                }
+                if (in1 == 0)
+                {
+                    idx -= 1;
+                }
+                if (idx < 0)
+                {
+                    idx = 0;
+                }
+                tft.fillScreen(TFT_BLACK);
+                tft.setCursor(0, 0);
+
+                strcpy(request, "");
+                request[0] = '\0';
+                strcpy(response, "");
+                response[0] = '\0';
+                offset = 0;
+                offset += sprintf(request + offset, "GET http://608dev-2.net/sandbox/sc/team3/mil4/new_viewing.py?index=%f&user=%s  HTTP/1.1\r\n", float(idx), user);
+                offset += sprintf(request + offset, "Host: 608dev-2.net\r\n\r\n");
+                Serial.println(request);
+                do_http_request("608dev-2.net", request, response, OUT_BUFFER_SIZE, RESPONSE_TIMEOUT, false);
+                Serial.println("-----------");
+                Serial.println(response);
+                Serial.println("-----------");
+                tft.println(response);
+            }
+            if (in3 == 0)
+            {
+                Serial.println("Here");
+                strcpy(request, "");
+                request[0] = '\0';
+                Serial.println("Here1");
+                strcpy(profemon, "");
+                profemon[0] = '\0';
+                Serial.println("Here2");
+                strcpy(bufferb, "");
+                bufferb[0] = '\0';
+                offset = 0;
+                offset += sprintf(request + offset, "GET http://608dev-2.net/sandbox/sc/team3/mil4/new_viewing.py?index=%f&user=%s&select=True  HTTP/1.1\r\n", float(idx), user);
+                offset += sprintf(request + offset, "Host: 608dev-2.net\r\n\r\n");
+                Serial.println(request);
+                do_http_request("608dev-2.net", request, profemon, 500, RESPONSE_TIMEOUT, false);
+                Serial.println("-----------");
+                Serial.println(profemon);
+                Serial.println("-----------");
+                tft.printf("Selected: %s", profemon);
+                strcpy(profemon_id, profemon);
+                profemon_id[strlen(profemon_id)-1] = '\0';
+                overallstate = 5;
+                battle_prep_state = BATTLING;
+            }
+
+            break;
+
+        case BATTLING:
+            break;
+        }
 }
 
 void update_battle_mode(int in1, int in2, int in3, int old1, int old2, int old3)
@@ -1569,7 +1791,7 @@ void make_server_request(int type)
         char *ptr = strtok(response_buffer, breaks);
 
         // Serial.printf("1: %s",ptr);
-        game_id = 103;
+        game_id = atoi(ptr);
         ptr = strtok(NULL, breaks);
 
         // Serial.printf("2: %s",ptr);
@@ -1913,7 +2135,7 @@ void update_idle_mode(int in1, int in2)
         {
             if (battle_or_catch == true)
             {
-                overallstate = 5;
+                overallstate = 7;
                 change_display = 1;
             }
             else
@@ -1928,7 +2150,7 @@ void update_idle_mode(int in1, int in2)
         break;
     case No:
         change_display = 1;
-        if (in2 == 1 && millis() - ask_timer > 5000)
+        if (in2 == 1)
         {
             idle_state = Idle;
         }

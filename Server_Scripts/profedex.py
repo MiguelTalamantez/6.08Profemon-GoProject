@@ -3,9 +3,9 @@ import datetime
 # import requests
 from bs4 import BeautifulSoup
 
-############################################
-# Code for editing/accessing full profedex #
-############################################
+###############################################
+# Code for editing/accessing overall profedex #
+###############################################
 
 def request_handler(request):
     # edited to get specific items if requested

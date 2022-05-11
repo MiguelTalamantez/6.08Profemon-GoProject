@@ -3,6 +3,10 @@ import sqlite3
 import datetime
 import time
 
+####################################################################
+# Python script for setting up profemon battle between two players #
+####################################################################
+
 def request_handler(request):
 
     if request['method'] == 'GET':

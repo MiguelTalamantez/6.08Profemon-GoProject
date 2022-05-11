@@ -3,9 +3,9 @@ import requests
 import datetime
 db = '/var/jail/home/team3/profedex.db'
 
-################################################
-# Code for editing/accessing player profedexes #
-################################################
+###########################################################
+# Code for editing/accessing individual player profedexes #
+###########################################################
 
 def request_handler(request):
     if request['method']=='GET' :

@@ -10,6 +10,10 @@ import string
 import datetime
 import time
 
+##########################################################
+# Python script that returns usernames of nearby players #
+##########################################################
+
 database = "/var/jail/home/team3/player_locations.db"
 
 locations = {

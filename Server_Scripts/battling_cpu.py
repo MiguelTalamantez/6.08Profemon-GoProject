@@ -2,6 +2,10 @@ import sqlite3
 import datetime
 import random
 
+##################################################
+# Python script to handle player vs. CPU battles #
+##################################################
+
 available = ['Peter Dourmashkin', 'Donald Sadoway', 'Adam Willard', 'Brad Pentelute', 'Rick Danheiser', 'John Bush', 'Larry Guth', 'David Jerison', 'Bjorn Poonen', 'Tristan Collins', 'John Guttag', 'Adam Hartz', 'Max Goldman', 'Silvina Hinono Wachman', 'Katrina LaCurts', 'Steven Leeb', 'Joe Steinmeyer', 'Erik Demaine', 'Mauricio Karchmer', 'David Karger']
 clone = available[:]
 game_id = 1

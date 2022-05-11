@@ -6,6 +6,10 @@ Created on Sun May  1 13:54:50 2022
 """
 import sqlite3
 
+#####################################################################################
+# Python script for viewing profemon in personal profedex in a user-friendly format #
+#####################################################################################
+
 database = "/var/jail/home/team3/profedex.db"
 
 def request_handler(request):

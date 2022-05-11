@@ -4,6 +4,10 @@ import random
 import requests
 db = '/var/jail/home/team3/prof_info.db'
 
+#####################################################
+# Python script to handle player vs. player battles #
+#####################################################
+
 def request_handler(request):
     if request['method'] == 'GET' :
         #label "turn". info the arduino provides: game_id, player_id
